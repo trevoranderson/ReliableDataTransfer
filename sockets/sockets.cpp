@@ -1,4 +1,7 @@
 #include "sockets.h"
+#include <iostream>
+#include <string>
+using namespace std;
 #define WIN32_LEAN_AND_MEAN
 
 #include <windows.h>
@@ -17,6 +20,15 @@
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_CLIENT_PORT "12345"
 #define DEFAULT_SERVER_PORT "54321"
+string bufferToString(char * buffer, int buffLen)
+{
+	char * message = new char[buffLen + 1];
+	memcpy(message, &buffer[0], buffLen);
+	message[buffLen] = 0;
+	string ret = message;
+	delete message;
+	return ret;
+}
 int client()
 {
 	auto servername = "localhost";
@@ -107,6 +119,7 @@ int client()
 	do {
 
 		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
+		cout << "Sever Sent: " << bufferToString(recvbuf, iResult) << endl;
 		if (iResult > 0)
 			printf("Bytes received: %d\n", iResult);
 		else if (iResult == 0)
@@ -207,6 +220,7 @@ int server()
 
 			// Echo the buffer back to the sender
 			iSendResult = send(ClientSocket, recvbuf, iResult, 0);
+			cout << "Client Sent: "<< bufferToString(recvbuf, iResult) << endl;
 			if (iSendResult == SOCKET_ERROR) {
 				printf("send failed with error: %d\n", WSAGetLastError());
 				closesocket(ClientSocket);
