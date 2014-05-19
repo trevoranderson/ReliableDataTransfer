@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <time.h>
-typedef int T;
+typedef char T;
 
 class RDT_Header
 {
@@ -27,6 +27,10 @@ public:
 	{}
 	RDT_Header::RDT_Header(std::string datagram)
 	{
+		if (datagram.size() < sizeof(T)* 4)
+		{
+			return; // No header
+		}
 		int size = sizeof(T);
 		memcpy(&seqNum, &datagram[0], size);
 		memcpy(&ackNum, &datagram[size * 1], size);

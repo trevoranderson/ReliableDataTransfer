@@ -1,4 +1,6 @@
 #include "sockets.h"
+#include "Server.h"
+#include "Client.h"
 #include <iostream>
 #include <string>
 using namespace std;
@@ -22,11 +24,15 @@ using namespace std;
 #define DEFAULT_SERVER_PORT "54321"
 string bufferToString(char * buffer, int buffLen)
 {
-	char * message = new char[buffLen + 1];
-	memcpy(message, &buffer[0], buffLen);
-	message[buffLen] = 0;
-	string ret = message;
-	delete message;
+	//char * message = new char[buffLen + 1];
+	//memcpy(message, &buffer[0], buffLen);
+	//message[buffLen] = 0;
+	//string ret = message;
+	//delete message;
+	//return ret;
+	std::string ret;
+	ret.resize(buffLen);
+	memcpy(&ret[0], &buffer[0], buffLen);
 	return ret;
 }
 int client()
@@ -96,7 +102,10 @@ int client()
 	}
 
 	// Send an initial buffer
-	iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
+	RDT_Header first;
+	first.seqNum = 0;
+	first.fin = 0;
+	iResult = send(ConnectSocket, first.toString().c_str(), first.toString().length(), 0);
 	if (iResult == SOCKET_ERROR) {
 		printf("send failed with error: %d\n", WSAGetLastError());
 		closesocket(ConnectSocket);
@@ -106,6 +115,47 @@ int client()
 
 	printf("Bytes Sent: %ld\n", iResult);
 
+
+	Client client;
+	ofstream outfile;
+
+	outfile.open("test.txt", std::ios_base::app);
+
+	// Receive until the peer closes the connection
+	do {
+
+		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
+		cout << "Sever Sent: " << bufferToString(recvbuf, iResult) << endl;
+		RDT_Header last(bufferToString(recvbuf, iResult));
+		outfile << last.data;
+		if (iResult > 0 && !last.fin)
+		{
+
+
+			auto toSend = client.nextPackets(last);
+
+			iResult = send(ConnectSocket, last.toString().c_str(), last.toString().length(), 0);
+			if (iResult == SOCKET_ERROR) {
+				printf("send failed with error: %d\n", WSAGetLastError());
+				closesocket(ConnectSocket);
+				WSACleanup();
+				return 1;
+			}
+			printf("Bytes received: %d\n", iResult);
+		}
+		else if (iResult == 0 || last.fin)
+		{
+			RDT_Header l;
+			l.fin = 1;
+			iResult = send(ConnectSocket , l.toString().c_str(), l.toString().length(), 0);
+			printf("Client () Connection closed\n");
+			break;
+		}
+		else
+			printf("recv failed with error: %d\n", WSAGetLastError());
+
+	} while (iResult > 0);
+
 	// shutdown the connection since no more data will be sent
 	iResult = shutdown(ConnectSocket, SD_SEND);
 	if (iResult == SOCKET_ERROR) {
@@ -114,21 +164,6 @@ int client()
 		WSACleanup();
 		return 1;
 	}
-
-	// Receive until the peer closes the connection
-	do {
-
-		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-		cout << "Sever Sent: " << bufferToString(recvbuf, iResult) << endl;
-		if (iResult > 0)
-			printf("Bytes received: %d\n", iResult);
-		else if (iResult == 0)
-			printf("Connection closed\n");
-		else
-			printf("recv failed with error: %d\n", WSAGetLastError());
-
-	} while (iResult > 0);
-
 	// cleanup
 	closesocket(ConnectSocket);
 	WSACleanup();
@@ -211,16 +246,47 @@ int server()
 	// No longer need server socket
 	closesocket(ListenSocket);
 
+
+
+	// Receive the first request and build a server object
+	Server server;
+	iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+	if (iResult > 0) {
+		printf("Bytes received: %d\n", iResult);
+		RDT_Header first;
+		first.data = "main.cpp";
+		first.fin = 0;
+		server = Server(first.data, 16);
+		auto response = server.nextPackets(first);
+		iSendResult = send(ClientSocket, response[0].toString().c_str(), response[0].toString().length(), 0);
+		cout << "Client Sent: " << bufferToString(recvbuf, iResult) << endl;
+		if (iSendResult == SOCKET_ERROR) {
+			printf("send failed with error: %d\n", WSAGetLastError());
+			closesocket(ClientSocket);
+			WSACleanup();
+			return 1;
+		}
+		printf("Bytes sent: %d\n", iSendResult);
+	}
+	else
+	{
+		return 1;
+	}
+
 	// Receive until the peer shuts down the connection
 	do {
-
 		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
-		if (iResult > 0) {
+		// Parse into useful format
+		RDT_Header last(bufferToString(recvbuf, iResult));
+
+		if (iResult > 0 && !last.fin) {
 			printf("Bytes received: %d\n", iResult);
 
+			auto responses = server.nextPackets(last);
+
 			// Echo the buffer back to the sender
-			iSendResult = send(ClientSocket, recvbuf, iResult, 0);
-			cout << "Client Sent: "<< bufferToString(recvbuf, iResult) << endl;
+			iSendResult = send(ClientSocket, responses[0].toString().c_str(), responses[0].toString().length(), 0);
+			cout << "Client Sent: " << bufferToString(recvbuf, iResult) << endl;
 			if (iSendResult == SOCKET_ERROR) {
 				printf("send failed with error: %d\n", WSAGetLastError());
 				closesocket(ClientSocket);
@@ -229,8 +295,14 @@ int server()
 			}
 			printf("Bytes sent: %d\n", iSendResult);
 		}
-		else if (iResult == 0)
-			printf("Connection closing...\n");
+		else if (iResult == 0 || last.fin)
+		{
+			RDT_Header l;
+			l.fin = 1;
+			iSendResult = send(ClientSocket, l.toString().c_str(), l.toString().length(), 0);
+			printf("Server() Connection closing...\n");
+			break;
+		}
 		else  {
 			printf("recv failed with error: %d\n", WSAGetLastError());
 			closesocket(ClientSocket);
