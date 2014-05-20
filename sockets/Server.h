@@ -41,8 +41,10 @@ public:
 	{
 		std::vector<RDT_Header> ret(1);
 		// send one packet with next seqNum
-		ret[0].seqNum = lastResponse.seqNum + 1;
+		ret[0].seqNum = lastResponse.seqNum +1;
+		ret[0].ackNum = lastResponse.ackNum;
 		ret[0].data = toRead.nextPage();
+		ret[0].len = ret[0].data.length();
 		ret[0].fin = 0;
 		if (lastResponse.fin || ret[0].data[0] == 0)
 		{

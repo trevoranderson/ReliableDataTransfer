@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <time.h>
+#include <iostream>
 typedef char T;
 
 class RDT_Header
@@ -12,6 +13,11 @@ public:
 		ret.resize(sizeof(T));
 		memcpy(&ret[0], &t, sizeof(T));
 		return ret;
+	}
+	void printReadable()
+	{
+		std::cout << "seq: " << (int)seqNum << ". ack: " << (int)ackNum << ". len: " << (int)len << ". fin: " << (int)fin << std::endl;
+		std::cout << "Data: " << data << std::endl;
 	}
 	std::string RDT_Header::toString()
 	{

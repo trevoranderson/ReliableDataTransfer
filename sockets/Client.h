@@ -14,7 +14,9 @@ public:
 	{
 		std::vector<RDT_Header> ret(1);
 		// send one packet with next seqNum
-		ret[0].seqNum = lastResponse.seqNum + 1;
+		ret[0].seqNum = lastResponse.seqNum;
+		ret[0].ackNum = lastResponse.ackNum + 1;
+		ret[0].len = 0;
 		ret[0].fin = 0;
 		if (lastResponse.fin)
 		{

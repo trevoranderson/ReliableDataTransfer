@@ -3,7 +3,9 @@
 #include "Client.h"
 #include <iostream>
 #include <string>
-using namespace std;
+#include <mutex>
+std::mutex outmut;
+
 #define WIN32_LEAN_AND_MEAN
 
 #include <windows.h>
@@ -20,9 +22,9 @@ using namespace std;
 
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_CLIENT_PORT "12345"
+
 #define DEFAULT_SERVER_PORT "54321"
-string bufferToString(char * buffer, int buffLen)
+std::string bufferToString(char * buffer, int buffLen)
 {
 	//char * message = new char[buffLen + 1];
 	//memcpy(message, &buffer[0], buffLen);
@@ -104,7 +106,10 @@ int client()
 	// Send an initial buffer
 	RDT_Header first;
 	first.seqNum = 0;
+	first.ackNum = 3;
 	first.fin = 0;
+	first.len = 0;
+	first.data = "main.cpp";
 	iResult = send(ConnectSocket, first.toString().c_str(), first.toString().length(), 0);
 	if (iResult == SOCKET_ERROR) {
 		printf("send failed with error: %d\n", WSAGetLastError());
@@ -113,11 +118,11 @@ int client()
 		return 1;
 	}
 
-	printf("Bytes Sent: %ld\n", iResult);
+	//printf("Bytes Sent: %ld\n", iResult);
 
 
 	Client client;
-	ofstream outfile;
+	std::ofstream outfile;
 
 	outfile.open("test.txt", std::ios_base::app);
 
@@ -125,7 +130,10 @@ int client()
 	do {
 
 		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-		cout << "Sever Sent: " << bufferToString(recvbuf, iResult) << endl;
+		outmut.lock();
+		std::cout << "Sever Sent:" << std::endl;
+		RDT_Header(bufferToString(recvbuf, iResult)).printReadable();
+		outmut.unlock();
 		RDT_Header last(bufferToString(recvbuf, iResult));
 		outfile << last.data;
 		if (iResult > 0 && !last.fin)
@@ -134,19 +142,20 @@ int client()
 
 			auto toSend = client.nextPackets(last);
 
-			iResult = send(ConnectSocket, last.toString().c_str(), last.toString().length(), 0);
+			iResult = send(ConnectSocket, toSend[0].toString().c_str(), toSend[0].toString().length(), 0);
 			if (iResult == SOCKET_ERROR) {
 				printf("send failed with error: %d\n", WSAGetLastError());
 				closesocket(ConnectSocket);
 				WSACleanup();
 				return 1;
 			}
-			printf("Bytes received: %d\n", iResult);
+		//	printf("Bytes received: %d\n", iResult);
 		}
 		else if (iResult == 0 || last.fin)
 		{
 			RDT_Header l;
 			l.fin = 1;
+			l.len = 0;
 			iResult = send(ConnectSocket , l.toString().c_str(), l.toString().length(), 0);
 			printf("Client () Connection closed\n");
 			break;
@@ -252,21 +261,27 @@ int server()
 	Server server;
 	iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
 	if (iResult > 0) {
-		printf("Bytes received: %d\n", iResult);
-		RDT_Header first;
-		first.data = "main.cpp";
+		//printf("Bytes received: %d\n", iResult);
+		RDT_Header first (bufferToString(recvbuf,iResult));
+	/*	first.data = "main.cpp";
+		first.seqNum = 1;
 		first.fin = 0;
+		first.ackNum = 3;
+		first.len = first.data.length();*/
 		server = Server(first.data, 16);
 		auto response = server.nextPackets(first);
 		iSendResult = send(ClientSocket, response[0].toString().c_str(), response[0].toString().length(), 0);
-		cout << "Client Sent: " << bufferToString(recvbuf, iResult) << endl;
+		outmut.lock();
+		std::cout << "Client Sent:" << std::endl;
+		RDT_Header(bufferToString(recvbuf, iResult)).printReadable();
+		outmut.unlock();
 		if (iSendResult == SOCKET_ERROR) {
 			printf("send failed with error: %d\n", WSAGetLastError());
 			closesocket(ClientSocket);
 			WSACleanup();
 			return 1;
 		}
-		printf("Bytes sent: %d\n", iSendResult);
+	//	printf("Bytes sent: %d\n", iSendResult);
 	}
 	else
 	{
@@ -280,20 +295,23 @@ int server()
 		RDT_Header last(bufferToString(recvbuf, iResult));
 
 		if (iResult > 0 && !last.fin) {
-			printf("Bytes received: %d\n", iResult);
+		//	printf("Bytes received: %d\n", iResult);
 
 			auto responses = server.nextPackets(last);
 
 			// Echo the buffer back to the sender
 			iSendResult = send(ClientSocket, responses[0].toString().c_str(), responses[0].toString().length(), 0);
-			cout << "Client Sent: " << bufferToString(recvbuf, iResult) << endl;
+			outmut.lock();
+			std::cout << "Client Sent:" << std::endl;
+			RDT_Header(bufferToString(recvbuf, iResult)).printReadable();
+			outmut.unlock();
 			if (iSendResult == SOCKET_ERROR) {
 				printf("send failed with error: %d\n", WSAGetLastError());
 				closesocket(ClientSocket);
 				WSACleanup();
 				return 1;
 			}
-			printf("Bytes sent: %d\n", iSendResult);
+		//	printf("Bytes sent: %d\n", iSendResult);
 		}
 		else if (iResult == 0 || last.fin)
 		{
