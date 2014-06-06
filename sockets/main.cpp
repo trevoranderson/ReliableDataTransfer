@@ -8,7 +8,7 @@ using namespace std;
 
 void NetworkTest()
 {
-	Client C(0.5);
+	Client C(0.1);
 
 	// Client initiates to Server
 	RDT_Header clientFirst;
@@ -19,7 +19,7 @@ void NetworkTest()
 	clientFirst.seqNum = 99;
 
 	// Create Server object from client request
-	Server S(clientFirst.data, 10, 2, 100, 0.5);
+	Server S("frognerd.html", 10, 2, 100, 0.1);
 
 
 	vector<RDT_Header> clientResponses = { clientFirst };

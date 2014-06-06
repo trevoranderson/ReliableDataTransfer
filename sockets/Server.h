@@ -14,7 +14,7 @@ public:
 		corruptionProbability = corruptProb;
 
 		path = serverpath;
-		offset = 0;
+		offset = -1;
 		pageSize = serverPageSize;
 
 		startTime = std::clock();
@@ -30,6 +30,11 @@ public:
 
 	std::vector<RDT_Header> nextPackets(RDT_Header lastResponse)
 	{
+		if (offset < 0)
+		{
+			offset = 0;
+			path = lastResponse.data;
+		}
 		std::vector<RDT_Header> ret;
 		if (!isCorruptPacket())
 		{
@@ -61,6 +66,10 @@ public:
 	std::vector<RDT_Header> timeOutPackets()
 	{
 		std::vector<RDT_Header> ret;
+		if (offset < 0)
+		{
+			return ret;
+		}
 		startTime = std::clock();
 		for (int i = seqbase; i < nextseq; i++)
 		{
@@ -87,7 +96,7 @@ private:
 	{
 		// Read the next 
 		std::ifstream strm;
-		strm.open(path);
+		strm.open(path.c_str());
 		strm.seekg(byteOffset);
 		std::string buffer;
 		buffer.resize(pageSize);

@@ -39,7 +39,7 @@ std::string bufferToString(char * buffer, int buffLen)
 }
 int client()
 {
-	auto servername = "localhost";
+	const char * servername = "localhost";
 
 	WSADATA wsaData;
 	SOCKET ConnectSocket = INVALID_SOCKET;
@@ -140,7 +140,7 @@ int client()
 		{
 
 
-			auto toSend = client.nextPacket(last);
+			std::vector<RDT_Header> toSend = client.nextPacket(last);
 			if (toSend.size() > 0)
 			{
 				iResult = send(ConnectSocket, toSend[0].toString().c_str(), toSend[0].toString().length(), 0);
@@ -271,7 +271,7 @@ int server()
 			first.ackNum = 3;
 			first.len = first.data.length();*/
 		server = Server(first.data, 16);
-		auto response = server.nextPackets(first);
+		std::vector<RDT_Header> response = server.nextPackets(first);
 		iSendResult = send(ClientSocket, response[0].toString().c_str(), response[0].toString().length(), 0);
 		outmut.lock();
 		std::cout << "Client Sent:" << std::endl;
@@ -299,7 +299,7 @@ int server()
 		if (iResult > 0 && !last.fin) {
 			//	printf("Bytes received: %d\n", iResult);
 
-			auto responses = server.nextPackets(last);
+			std::vector<RDT_Header> responses = server.nextPackets(last);
 
 			// Echo the buffer back to the sender
 			if (responses.size() > 0)
