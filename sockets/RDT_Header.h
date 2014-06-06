@@ -19,7 +19,7 @@ public:
 		std::cout << "seq: " << (int)seqNum << ". ack: " << (int)ackNum << ". len: " << (int)len << ". fin: " << (int)fin << std::endl;
 		std::cout << "Data: " << data << std::endl;
 	}
-	std::string RDT_Header::toString()
+	std::string toString()
 	{
 		std::string ret;
 		ret += TtoString(seqNum);
@@ -31,7 +31,7 @@ public:
 	}
 	RDT_Header()
 	{}
-	RDT_Header::RDT_Header(std::string datagram)
+	RDT_Header(std::string datagram)
 	{
 		if (datagram.size() < sizeof(T)* 4)
 		{
