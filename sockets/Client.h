@@ -6,23 +6,34 @@
 class Client
 {
 public:
-	Client()
+	Client(double corruptProb = 0.0)
 	{
-
+		expectedSeq = 0;
+		corruptionProbability = corruptProb;
 	}
-	std::vector<RDT_Header> nextPackets(RDT_Header lastResponse)
+	bool isCorruptPacket()
 	{
-		std::vector<RDT_Header> ret(1);
-		// send one packet with next seqNum
-		ret[0].seqNum = lastResponse.seqNum;
-		ret[0].ackNum = lastResponse.ackNum + 1;
-		ret[0].len = 0;
-		ret[0].fin = 0;
-		if (lastResponse.fin)
+		bool ret = (((double)rand() / (RAND_MAX)) < corruptionProbability);
+		return ret;
+	}
+	std::vector<RDT_Header> nextPacket(RDT_Header lastResponse)
+	{
+		std::vector<RDT_Header> ret;
+		if (!isCorruptPacket() && lastResponse.seqNum == expectedSeq)
 		{
-			ret[0].fin = 1;
+			CurrentChars += lastResponse.data;
+			RDT_Header toPush;
+			toPush.ackNum = lastResponse.seqNum;
+			toPush.data = "";
+			toPush.fin = lastResponse.fin;
+			toPush.len = 0;
+			toPush.seqNum = 99;
+			ret.push_back(toPush);
+			expectedSeq++;
 		}
 		return ret;
 	}
-
+	int expectedSeq;
+	std::string CurrentChars;
+	double corruptionProbability;
 };

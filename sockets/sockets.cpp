@@ -140,23 +140,25 @@ int client()
 		{
 
 
-			auto toSend = client.nextPackets(last);
-
-			iResult = send(ConnectSocket, toSend[0].toString().c_str(), toSend[0].toString().length(), 0);
-			if (iResult == SOCKET_ERROR) {
-				printf("send failed with error: %d\n", WSAGetLastError());
-				closesocket(ConnectSocket);
-				WSACleanup();
-				return 1;
+			auto toSend = client.nextPacket(last);
+			if (toSend.size() > 0)
+			{
+				iResult = send(ConnectSocket, toSend[0].toString().c_str(), toSend[0].toString().length(), 0);
+				if (iResult == SOCKET_ERROR) {
+					printf("send failed with error: %d\n", WSAGetLastError());
+					closesocket(ConnectSocket);
+					WSACleanup();
+					return 1;
+				}
 			}
-		//	printf("Bytes received: %d\n", iResult);
+			//	printf("Bytes received: %d\n", iResult);
 		}
 		else if (iResult == 0 || last.fin)
 		{
 			RDT_Header l;
 			l.fin = 1;
 			l.len = 0;
-			iResult = send(ConnectSocket , l.toString().c_str(), l.toString().length(), 0);
+			iResult = send(ConnectSocket, l.toString().c_str(), l.toString().length(), 0);
 			printf("Client () Connection closed\n");
 			break;
 		}
@@ -262,12 +264,12 @@ int server()
 	iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
 	if (iResult > 0) {
 		//printf("Bytes received: %d\n", iResult);
-		RDT_Header first (bufferToString(recvbuf,iResult));
-	/*	first.data = "main.cpp";
-		first.seqNum = 1;
-		first.fin = 0;
-		first.ackNum = 3;
-		first.len = first.data.length();*/
+		RDT_Header first(bufferToString(recvbuf, iResult));
+		/*	first.data = "main.cpp";
+			first.seqNum = 1;
+			first.fin = 0;
+			first.ackNum = 3;
+			first.len = first.data.length();*/
 		server = Server(first.data, 16);
 		auto response = server.nextPackets(first);
 		iSendResult = send(ClientSocket, response[0].toString().c_str(), response[0].toString().length(), 0);
@@ -281,7 +283,7 @@ int server()
 			WSACleanup();
 			return 1;
 		}
-	//	printf("Bytes sent: %d\n", iSendResult);
+		//	printf("Bytes sent: %d\n", iSendResult);
 	}
 	else
 	{
@@ -295,23 +297,26 @@ int server()
 		RDT_Header last(bufferToString(recvbuf, iResult));
 
 		if (iResult > 0 && !last.fin) {
-		//	printf("Bytes received: %d\n", iResult);
+			//	printf("Bytes received: %d\n", iResult);
 
 			auto responses = server.nextPackets(last);
 
 			// Echo the buffer back to the sender
-			iSendResult = send(ClientSocket, responses[0].toString().c_str(), responses[0].toString().length(), 0);
-			outmut.lock();
-			std::cout << "Client Sent:" << std::endl;
-			RDT_Header(bufferToString(recvbuf, iResult)).printReadable();
-			outmut.unlock();
-			if (iSendResult == SOCKET_ERROR) {
-				printf("send failed with error: %d\n", WSAGetLastError());
-				closesocket(ClientSocket);
-				WSACleanup();
-				return 1;
+			if (responses.size() > 0)
+			{
+				iSendResult = send(ClientSocket, responses[0].toString().c_str(), responses[0].toString().length(), 0);
+				outmut.lock();
+				std::cout << "Client Sent:" << std::endl;
+				RDT_Header(bufferToString(recvbuf, iResult)).printReadable();
+				outmut.unlock();
+				if (iSendResult == SOCKET_ERROR) {
+					printf("send failed with error: %d\n", WSAGetLastError());
+					closesocket(ClientSocket);
+					WSACleanup();
+					return 1;
+				}
 			}
-		//	printf("Bytes sent: %d\n", iSendResult);
+			//	printf("Bytes sent: %d\n", iSendResult);
 		}
 		else if (iResult == 0 || last.fin)
 		{

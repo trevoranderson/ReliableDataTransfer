@@ -33,7 +33,7 @@ public:
 	{}
 	RDT_Header(std::string datagram)
 	{
-		if (datagram.size() < sizeof(T)* 4)
+		if (datagram.size() < sizeof(T) * 4)
 		{
 			return; // No header
 		}
